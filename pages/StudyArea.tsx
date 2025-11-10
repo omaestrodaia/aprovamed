@@ -4,6 +4,7 @@ import { supabase } from '../services/supabaseClient';
 import { generateFlashcardsForTopic } from '../services/geminiService';
 import { SparklesIcon, BookOpenIcon, FolderKanbanIcon, FileQuestionIcon } from '../components/icons';
 import { PracticeQuestionsModal } from '../components/PracticeQuestionsModal';
+import { useAcademicData } from '../contexts/AcademicDataContext';
 
 
 // Define interfaces for the nested structure returned by Supabase
@@ -31,6 +32,9 @@ const StudyArea: React.FC = () => {
     // Practice Questions Modal
     const [isPracticeModalOpen, setIsPracticeModalOpen] = useState(false);
     const [practiceAssuntoId, setPracticeAssuntoId] = useState<string | null>(null);
+    
+    // Get base academic data from context
+    const { cursos, modulos, disciplinas, assuntos: allAssuntos, loading: academicLoading } = useAcademicData();
 
 
     const fetchData = useCallback(async () => {
@@ -44,40 +48,30 @@ const StudyArea: React.FC = () => {
                 .select('curso_id')
                 .eq('aluno_id', user.id);
             if (enrollError) throw enrollError;
-            const courseIds = enrollments.map(e => e.curso_id);
+            const enrolledCourseIds = enrollments.map(e => e.curso_id);
             
-            if (courseIds.length === 0) {
+            if (enrolledCourseIds.length === 0) {
                 setCoursesWithContent([]);
                 setAllEnrolledAssuntos([]);
                 setPracticeProgress(new Map());
-                setLoading(false);
-                return;
+                return; // Exit early
             }
 
-            // --- START REFACTOR: Break down large query into smaller, more reliable ones ---
-
-            // Fetch data in layers instead of one deep nested query to avoid timeouts
-            const { data: courses, error: coursesError } = await supabase.from('cursos').select('*').in('id', courseIds);
-            if (coursesError) throw coursesError;
-
-            const { data: modulos, error: modulosError } = await supabase.from('modulos').select('*').in('curso_id', courseIds);
-            if (modulosError) throw modulosError;
-            const moduloIds = (modulos || []).map(m => m.id);
-
-            const { data: disciplinas, error: discError } = await supabase.from('disciplinas').select('*').in('modulo_id', moduloIds);
-            if (discError) throw discError;
-            const disciplinaIds = (disciplinas || []).map(d => d.id);
-
-            const { data: assuntosRaw, error: assuntosError } = await supabase.from('assuntos').select('*').in('disciplina_id', disciplinaIds);
-            if (assuntosError) throw assuntosError;
-            const assuntoIds = (assuntosRaw || []).map(a => a.id);
-
-            // Fetch content for all assuntos in parallel
+            // Filter context data based on enrollment
+            const enrolledCursos = cursos.filter(c => enrolledCourseIds.includes(c.id));
+            const enrolledModulos = modulos.filter(m => m.curso_id && enrolledCourseIds.includes(m.curso_id));
+            const enrolledModuloIds = enrolledModulos.map(m => m.id);
+            const enrolledDisciplinas = disciplinas.filter(d => d.modulo_id && enrolledModuloIds.includes(d.modulo_id));
+            const enrolledDisciplinaIds = enrolledDisciplinas.map(d => d.id);
+            const enrolledAssuntos = allAssuntos.filter(a => a.disciplina_id && enrolledDisciplinaIds.includes(a.disciplina_id));
+            const enrolledAssuntoIds = enrolledAssuntos.map(a => a.id);
+            
+            // Fetch only the dynamic, student-specific content
             const [materiaisRes, decksRes, questoesRes, progressRes] = await Promise.all([
-                supabase.from('materiais_estudo').select('*').in('assunto_id', assuntoIds),
-                supabase.from('flashcard_decks').select('*, assunto:assuntos(descricao)').in('assunto_id', assuntoIds),
-                supabase.from('questoes').select('id, assunto_id').in('assunto_id', assuntoIds),
-                supabase.from('pratica_assunto_progresso').select('*').eq('aluno_id', user.id).in('assunto_id', assuntoIds),
+                supabase.from('materiais_estudo').select('*').in('assunto_id', enrolledAssuntoIds),
+                supabase.from('flashcard_decks').select('*, assunto:assuntos(descricao)').in('assunto_id', enrolledAssuntoIds),
+                supabase.from('questoes').select('id, assunto_id').in('assunto_id', enrolledAssuntoIds),
+                supabase.from('pratica_assunto_progresso').select('*').eq('aluno_id', user.id).in('assunto_id', enrolledAssuntoIds),
             ]);
 
             if (materiaisRes.error) throw materiaisRes.error;
@@ -86,28 +80,25 @@ const StudyArea: React.FC = () => {
             if (progressRes.error) throw progressRes.error;
 
             // Stitch data together client-side
-            // FIX: Add `any` type to map/forEach callbacks to prevent 'unknown' type errors from Supabase data.
-            const assuntosMap = new Map((assuntosRaw || []).map((a: any) => [a.id, { ...a, materiais_estudo: [], flashcard_decks: [], questoes: [] }]));
+            const assuntosMap = new Map(enrolledAssuntos.map((a: any) => [a.id, { ...a, materiais_estudo: [], flashcard_decks: [], questoes: [] }]));
             (materiaisRes.data || []).forEach((m: any) => (assuntosMap.get(m.assunto_id) as any)?.materiais_estudo.push(m));
             (decksRes.data || []).forEach((d: any) => (assuntosMap.get(d.assunto_id) as any)?.flashcard_decks.push(d as any));
             (questoesRes.data || []).forEach((q: any) => (assuntosMap.get(q.assunto_id) as any)?.questoes.push(q as any));
-            const assuntos = Array.from(assuntosMap.values());
+            const finalAssuntos = Array.from(assuntosMap.values());
 
-            const disciplinasMap = new Map((disciplinas || []).map((d: any) => [d.id, { ...d, assuntos: [] }]));
-            assuntos.forEach((a: any) => (disciplinasMap.get(a.disciplina_id) as any)?.assuntos.push(a as any));
+            const disciplinasMap = new Map(enrolledDisciplinas.map((d: any) => [d.id, { ...d, assuntos: [] }]));
+            finalAssuntos.forEach((a: any) => (disciplinasMap.get(a.disciplina_id) as any)?.assuntos.push(a as any));
 
-            const modulosMap = new Map((modulos || []).map((m: any) => [m.id, { ...m, disciplinas: [] }]));
+            const modulosMap = new Map(enrolledModulos.map((m: any) => [m.id, { ...m, disciplinas: [] }]));
             Array.from(disciplinasMap.values()).forEach((d: any) => (modulosMap.get(d.modulo_id) as any)?.disciplinas.push(d as any));
 
-            const stitchedCourses = (courses || []).map((c: any) => ({
+            const stitchedCourses = enrolledCursos.map((c: any) => ({
                 ...c,
                 modulos: Array.from(modulosMap.values()).filter((m: any) => m.curso_id === c.id)
             }));
             
-            // --- END REFACTOR ---
-
             setCoursesWithContent(stitchedCourses as CourseWithContent[]);
-            setAllEnrolledAssuntos(assuntos as AssuntoWithContent[]);
+            setAllEnrolledAssuntos(finalAssuntos as AssuntoWithContent[]);
             
             const progressMap = new Map<string, PracticeProgress>();
             (progressRes.data || []).forEach(p => progressMap.set(p.assunto_id, p));
@@ -115,9 +106,8 @@ const StudyArea: React.FC = () => {
 
             // Preserve selection or set default
             setSelectedAssunto(currentValue => {
-                // FIX: Add `any` type to `a` and cast `assuntos[0]` to `any` to fix 'unknown' type errors.
-                if (!currentValue || !assuntos.some((a: any) => a.id === currentValue)) {
-                    return assuntos.length > 0 ? (assuntos[0] as any).id : '';
+                if (!currentValue || !finalAssuntos.some((a: any) => a.id === currentValue)) {
+                    return finalAssuntos.length > 0 ? (finalAssuntos[0] as any).id : '';
                 }
                 return currentValue;
             });
@@ -127,11 +117,13 @@ const StudyArea: React.FC = () => {
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [cursos, modulos, disciplinas, allAssuntos]);
 
     useEffect(() => {
-        fetchData();
-    }, [fetchData]);
+        if (!academicLoading) {
+            fetchData();
+        }
+    }, [fetchData, academicLoading]);
     
     const handleStartPractice = (assunto: AssuntoWithContent) => {
         setPracticeAssuntoId(assunto.id);
@@ -171,6 +163,8 @@ const StudyArea: React.FC = () => {
             setIsGenerating(false);
         }
     };
+
+    const finalLoading = loading || academicLoading;
 
     return (
         <div className="space-y-8 animate-fade-in">
@@ -213,7 +207,7 @@ const StudyArea: React.FC = () => {
             {/* Courses Content */}
             <div className="space-y-6">
                  <h2 className="text-2xl font-bold text-gray-900">Meus Cursos</h2>
-                 {loading ? <p>Carregando conteúdo...</p> :
+                 {finalLoading ? <p>Carregando conteúdo...</p> :
                  coursesWithContent.length > 0 ? (
                     coursesWithContent.map(course => {
                         const courseAssuntos = course.modulos.flatMap(m => m.disciplinas.flatMap(d => d.assuntos));

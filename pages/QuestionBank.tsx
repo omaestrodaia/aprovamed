@@ -13,6 +13,7 @@ import { SaveQuestionsModal } from '../components/SaveQuestionsModal';
 import { DashboardMetrics } from '../components/DashboardMetrics';
 // FIX: Import XIcon to be used in the LinkQuestionsModal component.
 import { EditIcon, TrashIcon, SearchIcon, SparklesIcon, XIcon } from '../components/icons';
+import { useAcademicData } from '../contexts/AcademicDataContext';
 
 const fileToBase64 = (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
@@ -35,21 +36,11 @@ export const UploadQuestions: React.FC = () => {
   const [isEditorModalOpen, setIsEditorModalOpen] = useState(false);
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
-  const [disciplinas, setDisciplinas] = useState<Disciplina[]>([]);
-  const [assuntos, setAssuntos] = useState<Assunto[]>([]);
   const [progress, setProgress] = useState<{processed: number; total: number; status: string} | null>(null);
   const [saveProgress, setSaveProgress] = useState<{processed: number; total: number; status: string} | null>(null);
 
-  useEffect(() => {
-    // Fetch academic data for the editor and save modals
-    const fetchAcademicData = async () => {
-        const { data: discData } = await supabase.from('disciplinas').select('*');
-        const { data: assData } = await supabase.from('assuntos').select('*');
-        setDisciplinas(discData || []);
-        setAssuntos(assData || []);
-    };
-    fetchAcademicData();
-  }, []);
+  // Use the central academic data context
+  const { disciplinas, assuntos, refetch: refetchAcademicData } = useAcademicData();
   
   const handleProgress = useCallback((update: { processed: number, total: number, status: string }) => {
     setProgress(update);
@@ -646,35 +637,28 @@ const QuestionBank: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isEditorModalOpen, setIsEditorModalOpen] = useState(false);
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
-  const [disciplinas, setDisciplinas] = useState<Disciplina[]>([]);
-  const [assuntos, setAssuntos] = useState<Assunto[]>([]);
   const [selectedQuestionIds, setSelectedQuestionIds] = useState<Set<number>>(new Set());
   const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
   const [testes, setTestes] = useState<Test[]>([]);
   const [flashcardDecks, setFlashcardDecks] = useState<FlashcardDeck[]>([]);
   const [loteFilters, setLoteFilters] = useState<string[]>([]);
   const [selectedLote, setSelectedLote] = useState<string>('');
+  
+  // Use the central academic data context
+  const { disciplinas, assuntos, loading: academicDataLoading } = useAcademicData();
 
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-        const [qRes, dRes, aRes, tRes, fdRes] = await Promise.all([
+        const [qRes, tRes, fdRes] = await Promise.all([
             supabase.from('questoes').select('*').order('id', { ascending: false }),
-            supabase.from('disciplinas').select('*'),
-            supabase.from('assuntos').select('*'),
             supabase.from('testes').select('*'),
             supabase.from('flashcard_decks').select('*, assunto:assuntos(descricao)'),
         ]);
 
         if (qRes.error) throw qRes.error;
-        if (dRes.error) throw dRes.error;
-        if (aRes.error) throw aRes.error;
         if (tRes.error) throw tRes.error;
         if (fdRes.error) throw fdRes.error;
 
@@ -702,8 +686,6 @@ const QuestionBank: React.FC = () => {
         const uniqueLotes = [...new Set(questionsData.map(q => q.lotes).filter(Boolean))] as string[];
         setLoteFilters(uniqueLotes.sort());
         
-        setDisciplinas(dRes.data as Disciplina[]);
-        setAssuntos(aRes.data as Assunto[]);
         setTestes(tRes.data.map(t => ({...t, scheduledDate: t.scheduled_date})) as Test[]);
         setFlashcardDecks(fdRes.data.map((d: any) => ({...d, titulo: `Revisão de ${d.assunto?.descricao || 'Tópico'}`})) as FlashcardDeck[]);
 
@@ -712,7 +694,11 @@ const QuestionBank: React.FC = () => {
     } finally {
         setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const handleEdit = (question: Question) => {
     setEditingQuestion(question);
@@ -840,9 +826,9 @@ const QuestionBank: React.FC = () => {
                 />
             </div>
             
-            {loading && <p>Carregando questões...</p>}
+            {(loading || academicDataLoading) && <p>Carregando questões...</p>}
             {error && <p className="text-red-500">Erro: {error}</p>}
-            {!loading && !error && (
+            {!(loading || academicDataLoading) && !error && (
                 <div className="overflow-x-auto">
                     <table className="w-full text-left">
                          <thead className="bg-gray-50">

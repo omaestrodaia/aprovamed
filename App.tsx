@@ -14,123 +14,84 @@ import MaterialEstudo from './pages/MaterialEstudo';
 import Auth from './pages/Auth';
 import { supabase } from './services/supabaseClient';
 import { Session } from '@supabase/supabase-js';
+import { useAcademicData } from './contexts/AcademicDataContext';
 
 const App: React.FC = () => {
     const [session, setSession] = useState<Session | null>(null);
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
     const [currentPage, setCurrentPage] = useState('dashboard');
+    const { refetch: refetchAcademicData, clearData: clearAcademicData } = useAcademicData();
 
     const fetchUserProfile = useCallback(async (session: Session | null): Promise<User | null> => {
-        if (!session?.user) {
+        if (!session?.user?.id || !session.user.email) {
             return null;
         }
     
-        const userId = session.user.id;
-    
         try {
-            // 1. Check if user is an admin
-            const { data: adminData, error: adminError } = await supabase.from('admins').select('*').eq('id', userId).maybeSingle();
-            if (adminError) throw adminError;
-            if (adminData) {
-                return {
-                    id: adminData.id,
-                    name: adminData.name || session.user.email?.split('@')[0] || 'Admin',
-                    email: adminData.email,
-                    role: 'admin',
-                    avatarUrl: adminData.avatar_url || `https://i.pravatar.cc/150?u=${adminData.id}`,
-                    registrationDate: adminData.created_at,
-                    status: 'active'
-                };
+            // Call the new, efficient database function instead of multiple client-side queries.
+            const { data, error } = await supabase.rpc('get_user_profile', {
+                user_id: session.user.id,
+                user_email: session.user.email
+            });
+    
+            if (error) {
+                console.error("Error calling get_user_profile RPC:", error);
+                throw error;
             }
     
-            // 2. If not admin, check if student profile exists
-            const { data: studentData, error: studentError } = await supabase.from('alunos').select('*').eq('id', userId).maybeSingle();
-            if (studentError) throw studentError;
-            if (studentData) {
-                return {
-                    id: studentData.id,
-                    name: studentData.name,
-                    email: studentData.email,
-                    role: 'student',
-                    avatarUrl: studentData.avatar_url || `https://i.pravatar.cc/150?u=${studentData.id}`,
-                    registrationDate: studentData.registration_date,
-                    status: studentData.status
-                };
-            }
-    
-            // 3. If no profile exists, create one. Use upsert to handle potential race conditions gracefully.
-            const newUserPayload = {
-                id: userId,
-                name: session.user.email?.split('@')[0] || 'Novo Aluno',
-                email: session.user.email,
-                status: 'active' as const,
-            };
-            const { data: newStudentData, error: upsertError } = await supabase
-                .from('alunos')
-                .upsert(newUserPayload)
-                .select()
-                .single();
-            
-            if (upsertError) {
-                throw upsertError;
-            }
-            
-            return {
-                id: newStudentData.id,
-                name: newStudentData.name,
-                email: newStudentData.email,
-                role: 'student',
-                avatarUrl: newStudentData.avatar_url || `https://i.pravatar.cc/150?u=${newStudentData.id}`,
-                registrationDate: newStudentData.registration_date,
-                status: newStudentData.status
-            };
+            // The data from the RPC call is the complete user profile JSON.
+            return data as User;
     
         } catch (error: any) {
-             console.error("Critical error fetching or creating user profile:", error);
-             // Return null to allow the UI to redirect to the Auth page.
+             console.error("Critical error fetching user profile via RPC:", error);
              return null;
         }
     }, []);
 
     useEffect(() => {
         setLoading(true);
-        // Failsafe timeout. If authentication takes too long, stop loading and show the login page.
         const timeoutId = setTimeout(() => {
             console.warn("Session loading timed out after 8 seconds. This could be a backend or network issue.");
+            clearAcademicData();
+            setSession(null);
+            setUser(null);
             setLoading(false);
         }, 8000);
-    
+
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
             async (_event, session) => {
                 try {
-                    // We received an auth event, so now we fetch the full user profile.
-                    setSession(session);
                     const userProfile = await fetchUserProfile(session);
+                    setSession(session);
                     setUser(userProfile);
+                    
+                    if (userProfile) {
+                        await refetchAcademicData();
+                    } else {
+                        clearAcademicData();
+                    }
                     
                     if (_event === 'SIGNED_OUT') {
                         setCurrentPage('dashboard');
                     }
                 } catch (error) {
                     console.error("Error during auth state change handling:", error);
-                    // Ensure user state is cleared on error to prevent being stuck.
                     setUser(null);
                     setSession(null);
+                    clearAcademicData();
                 } finally {
-                    // Regardless of success or failure in fetching the profile, the auth process is complete.
-                    // We can now clear the failsafe timeout and stop the loading screen.
                     clearTimeout(timeoutId);
                     setLoading(false);
                 }
             }
         );
-    
+
         return () => {
             subscription.unsubscribe();
-            clearTimeout(timeoutId); // Cleanup on component unmount
+            clearTimeout(timeoutId);
         };
-    }, [fetchUserProfile]);
+    }, [fetchUserProfile, refetchAcademicData, clearAcademicData]);
 
 
     const handleLogout = async () => {
@@ -138,14 +99,21 @@ const App: React.FC = () => {
     };
     
     if (loading) {
-        return <div className="min-h-screen flex items-center justify-center bg-gray-50">Carregando Sessão...</div>;
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-gray-50">
+                <img 
+                    src="https://pub-872633efa2d545638be12ea86363c2ca.r2.dev/WhatsApp%20Image%202025-11-09%20at%2013.47.15.png" 
+                    alt="AprovaMed Logo" 
+                    className="h-32 w-auto animate-pulse" 
+                />
+            </div>
+        );
     }
 
     if (!session || !user) {
         return <Auth />;
     }
 
-    // FIX: Changed JSX.Element to React.ReactElement to resolve "Cannot find namespace 'JSX'" error.
     const pages: Record<string, React.ReactElement> = {
         'dashboard': user.role === 'admin' ? <AdminDashboard setCurrentPage={setCurrentPage} /> : <StudentDashboard />,
         'upload-questions': <UploadQuestions />,
@@ -168,16 +136,7 @@ const App: React.FC = () => {
             setCurrentPage={setCurrentPage}
             onLogout={handleLogout}
         >
-            <div style={{ display: currentPage === 'dashboard' ? 'block' : 'none' }}>{pages['dashboard']}</div>
-            <div style={{ display: currentPage === 'upload-questions' ? 'block' : 'none' }}>{pages['upload-questions']}</div>
-            <div style={{ display: currentPage === 'question-bank' ? 'block' : 'none' }}>{pages['question-bank']}</div>
-            <div style={{ display: currentPage === 'academic-management' ? 'block' : 'none' }}>{pages['academic-management']}</div>
-            <div style={{ display: currentPage === 'study-material' ? 'block' : 'none' }}>{pages['study-material']}</div>
-            <div style={{ display: currentPage === 'students' ? 'block' : 'none' }}>{pages['students']}</div>
-            <div style={{ display: currentPage === 'tests' ? 'block' : 'none' }}>{pages['tests']}</div>
-            <div style={{ display: currentPage === 'learning-paths' ? 'block' : 'none' }}>{pages['learning-paths']}</div>
-            <div style={{ display: currentPage === 'study-area' ? 'block' : 'none' }}>{pages['study-area']}</div>
-            <div style={{ display: currentPage === 'my-tests' ? 'block' : 'none' }}>{pages['my-tests']}</div>
+            {pageToRender}
         </Layout>
     );
 };

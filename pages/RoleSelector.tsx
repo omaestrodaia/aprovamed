@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Role } from '../types';
 import { BrainCircuitIcon } from '../components/icons';
@@ -21,7 +20,7 @@ export const RoleSelector: React.FC<RoleSelectorProps> = ({ onSelectRole }) => {
     return (
         <div className="min-h-screen bg-gray-50 flex flex-col justify-center items-center p-4">
             <div className="text-center mb-12">
-                <img src="https://i.imgur.com/4I15n6c.png" alt="AprovaMed Logo" className="h-20 mx-auto mb-6" />
+                <img src="https://pub-872633efa2d545638be12ea86363c2ca.r2.dev/WhatsApp%20Image%202025-11-09%20at%2013.47.15.png" alt="AprovaMed Logo" className="h-20 mx-auto mb-6" />
                 <p className="mt-4 text-lg text-gray-600 max-w-2xl mx-auto">Sua plataforma de aprendizado inteligente. Escolha seu perfil para começar.</p>
             </div>
             <div className="flex flex-col md:flex-row gap-8">

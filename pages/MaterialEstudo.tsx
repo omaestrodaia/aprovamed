@@ -1,18 +1,13 @@
-
-
-
-
 import React, { useState, useEffect } from 'react';
 import { MaterialEstudo, Disciplina, Assunto } from '../types';
 import { PlusCircleIcon, BookCopyIcon, TrashIcon, EditIcon } from '../components/icons';
 import { supabase } from '../services/supabaseClient';
+import { useAcademicData } from '../contexts/AcademicDataContext';
 
 type MaterialTipo = 'pdf' | 'ppt' | 'video';
 
 const MaterialEstudo: React.FC = () => {
     const [material, setMaterial] = useState<MaterialEstudo[]>([]);
-    const [disciplinas, setDisciplinas] = useState<Disciplina[]>([]);
-    const [assuntos, setAssuntos] = useState<Assunto[]>([]);
     const [loading, setLoading] = useState(true);
 
     const [isFormVisible, setIsFormVisible] = useState(false);
@@ -21,6 +16,9 @@ const MaterialEstudo: React.FC = () => {
     const [url, setUrl] = useState('');
     const [disciplinaId, setDisciplinaId] = useState('');
     const [assuntoId, setAssuntoId] = useState('');
+
+    // Use the central academic data context
+    const { disciplinas, assuntos, loading: academicLoading, refetch: refetchAcademicData } = useAcademicData();
 
     useEffect(() => {
         fetchData();
@@ -32,22 +30,12 @@ const MaterialEstudo: React.FC = () => {
             const { data: matData, error: matError } = await supabase.from('materiais_estudo').select('*');
             if (matError) throw matError;
             setMaterial(matData || []);
-            
-            const { data: discData, error: discError } = await supabase.from('disciplinas').select('*');
-            if (discError) throw discError;
-            setDisciplinas(discData || []);
-            
-            const { data: assData, error: assError } = await supabase.from('assuntos').select('*');
-            if (assError) throw assError;
-            setAssuntos(assData || []);
-
         } catch(e: any) {
             console.error("Error fetching materials data:", e.message);
         } finally {
             setLoading(false);
         }
     }
-
 
     const handleAddMaterial = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -100,6 +88,8 @@ const MaterialEstudo: React.FC = () => {
             case 'video': return 'Vídeo';
         }
     }
+    
+    const finalLoading = loading || academicLoading;
 
     return (
         <div className="space-y-8 animate-fade-in">
@@ -167,7 +157,7 @@ const MaterialEstudo: React.FC = () => {
                 )}
                 
                 <div className="overflow-x-auto">
-                    {loading ? (
+                    {finalLoading ? (
                          <div className="text-center py-16 text-gray-500">Carregando materiais...</div>
                     ) : (
                     <table className="w-full text-left">
@@ -198,7 +188,7 @@ const MaterialEstudo: React.FC = () => {
                         </tbody>
                     </table>
                     )}
-                    {!loading && material.length === 0 && (
+                    {!finalLoading && material.length === 0 && (
                         <div className="text-center py-16">
                             <BookCopyIcon className="w-12 h-12 mx-auto text-gray-400 mb-4"/>
                             <p className="text-gray-500 font-semibold">Nenhum material de estudo cadastrado.</p>

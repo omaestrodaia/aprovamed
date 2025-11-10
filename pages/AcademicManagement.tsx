@@ -3,19 +3,18 @@ import { Curso, Modulo, Disciplina, Assunto } from '../types';
 import { supabase } from '../services/supabaseClient';
 import { AcademicItemFormModal } from '../components/AcademicItemFormModal';
 import { PlusCircleIcon, EditIcon, TrashIcon, FolderKanbanIcon } from '../components/icons';
+import { useAcademicData } from '../contexts/AcademicDataContext';
 
 type AcademicItem = Curso | Modulo | Disciplina | Assunto;
 type ItemType = 'curso' | 'modulo' | 'disciplina' | 'assunto';
 
 const AcademicManagement: React.FC = () => {
     const [activeTab, setActiveTab] = useState<ItemType>('curso');
-    const [items, setItems] = useState<AcademicItem[]>([]);
-    const [cursos, setCursos] = useState<Curso[]>([]);
-    const [modulos, setModulos] = useState<Modulo[]>([]);
-    const [disciplinas, setDisciplinas] = useState<Disciplina[]>([]);
-    const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingItem, setEditingItem] = useState<AcademicItem | null>(null);
+
+    // Use the central data context
+    const { cursos, modulos, disciplinas, assuntos, loading, refetch } = useAcademicData();
 
     const tables: Record<ItemType, string> = {
         curso: 'cursos',
@@ -23,46 +22,16 @@ const AcademicManagement: React.FC = () => {
         disciplina: 'disciplinas',
         assunto: 'assuntos',
     };
-
-    useEffect(() => {
-        fetchAllData();
-    }, []);
-
-    useEffect(() => {
-        fetchItems(activeTab);
-    }, [activeTab]);
-
-    const fetchAllData = async () => {
-        setLoading(true);
-        try {
-            const [cursosRes, modulosRes, disciplinasRes] = await Promise.all([
-                supabase.from('cursos').select('*'),
-                supabase.from('modulos').select('*'),
-                supabase.from('disciplinas').select('*'),
-            ]);
-            if (cursosRes.error) throw cursosRes.error;
-            setCursos(cursosRes.data);
-            if (modulosRes.error) throw modulosRes.error;
-            setModulos(modulosRes.data);
-            if (disciplinasRes.error) throw disciplinasRes.error;
-            setDisciplinas(disciplinasRes.data);
-        } catch (error) {
-            console.error("Error fetching all academic data:", error);
+    
+    const items: AcademicItem[] = useMemo(() => {
+        switch(activeTab) {
+            case 'curso': return cursos;
+            case 'modulo': return modulos;
+            case 'disciplina': return disciplinas;
+            case 'assunto': return assuntos;
+            default: return [];
         }
-        setLoading(false);
-    };
-
-    const fetchItems = async (type: ItemType) => {
-        setLoading(true);
-        const { data, error } = await supabase.from(tables[type]).select('*').order('descricao', { ascending: true });
-        if (error) {
-            console.error(`Error fetching ${type}s:`, error);
-            setItems([]);
-        } else {
-            setItems(data);
-        }
-        setLoading(false);
-    };
+    }, [activeTab, cursos, modulos, disciplinas, assuntos]);
 
     const getParentName = (item: AcademicItem) => {
         if ('curso_id' in item && item.curso_id) {
@@ -94,8 +63,7 @@ const AcademicManagement: React.FC = () => {
             const { error } = await supabase.from(tables[activeTab]).insert([payload]);
             if (error) alert(`Erro ao criar: ${error.message}`);
         }
-        fetchItems(activeTab);
-        fetchAllData(); // Re-fetch all data to update parent names
+        await refetch(); // Refetch all academic data for consistency
         setIsModalOpen(false);
         setEditingItem(null);
     };
@@ -104,7 +72,7 @@ const AcademicManagement: React.FC = () => {
         if (window.confirm('Tem certeza? A remoção pode afetar itens dependentes.')) {
             const { error } = await supabase.from(tables[activeTab]).delete().eq('id', id);
             if (error) alert(`Erro ao deletar: ${error.message}`);
-            else fetchItems(activeTab);
+            else await refetch(); // Refetch all academic data
         }
     };
     

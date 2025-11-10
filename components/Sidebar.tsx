@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Role } from '../types';
 import {
@@ -66,7 +65,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ userRole, currentPage, setCurr
   return (
     <aside className="w-64 bg-white flex flex-col border-r border-gray-200">
       <div className="p-4 flex items-center justify-center border-b border-gray-200 h-20">
-         <img src="https://i.imgur.com/4I15n6c.png" alt="AprovaMed Logo" className="h-12 w-auto" />
+         <img src="https://pub-872633efa2d545638be12ea86363c2ca.r2.dev/WhatsApp%20Image%202025-11-09%20at%2013.47.15.png" alt="AprovaMed Logo" className="h-12 w-auto" />
       </div>
       <nav className="flex-1 px-4 py-4 space-y-2">
         {navItems.map((item) => (
