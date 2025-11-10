@@ -1,12 +1,13 @@
+
+
 import React from 'react';
 import { SendStatus, SendReport } from '../types';
 import { XIcon, CheckCircleIcon, XCircleIcon } from './icons';
 
 const Spinner: React.FC = () => (
-    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
 );
 
-// Fix: Define the missing SendStatusModalProps interface.
 interface SendStatusModalProps {
   isOpen: boolean;
   status: SendStatus;
@@ -39,7 +40,7 @@ export const SendStatusModal: React.FC<SendStatusModalProps> = ({ isOpen, status
                     <Spinner />
                     <p className="mt-4 text-gray-600">Enviando questão {report ? report.successCount + report.errorCount + 1 : 1} de {report?.total || '...'}</p>
                     <div className="w-full bg-gray-200 rounded-full h-2.5 mt-4">
-                        <div className="bg-purple-600 h-2.5 rounded-full" style={{ width: `${progress}%` }}></div>
+                        <div className="bg-blue-600 h-2.5 rounded-full" style={{ width: `${progress}%` }}></div>
                     </div>
                 </div>
             )}
@@ -71,7 +72,7 @@ export const SendStatusModal: React.FC<SendStatusModalProps> = ({ isOpen, status
         </div>
         {status === 'complete' && (
             <div className="flex justify-end p-5 border-t border-gray-200 bg-gray-50 rounded-b-xl">
-                 <button onClick={onClose} className="px-5 py-2.5 bg-purple-600 text-white font-semibold rounded-lg hover:bg-purple-700 transition-colors">Fechar Relatório</button>
+                 <button onClick={onClose} className="px-5 py-2.5 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors">Fechar Relatório</button>
             </div>
         )}
       </div>

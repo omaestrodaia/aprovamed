@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { User } from '../types';
 import { XIcon } from './icons';
@@ -63,7 +64,7 @@ export const StudentFormModal: React.FC<StudentFormModalProps> = ({ student, isO
               required
               value={formData.name}
               onChange={handleInputChange}
-              className="w-full bg-white border border-gray-300 rounded-md p-3 text-gray-800 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+              className="w-full bg-white border border-gray-300 rounded-md p-3 text-gray-800 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               placeholder="Ex: Ana Silva"
             />
           </div>
@@ -76,7 +77,7 @@ export const StudentFormModal: React.FC<StudentFormModalProps> = ({ student, isO
               required
               value={formData.email}
               onChange={handleInputChange}
-              className="w-full bg-white border border-gray-300 rounded-md p-3 text-gray-800 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+              className="w-full bg-white border border-gray-300 rounded-md p-3 text-gray-800 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               placeholder="Ex: ana.silva@email.com"
             />
           </div>
@@ -87,7 +88,7 @@ export const StudentFormModal: React.FC<StudentFormModalProps> = ({ student, isO
               name="status"
               value={formData.status}
               onChange={handleInputChange}
-              className="w-full bg-white border border-gray-300 rounded-md p-3 text-gray-800 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+              className="w-full bg-white border border-gray-300 rounded-md p-3 text-gray-800 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
               <option value="active">Ativo</option>
               <option value="inactive">Inativo</option>
@@ -96,7 +97,7 @@ export const StudentFormModal: React.FC<StudentFormModalProps> = ({ student, isO
         </div>
         <div className="flex justify-end p-5 border-t border-gray-200 bg-gray-50 rounded-b-xl">
           <button type="button" onClick={onClose} className="px-5 py-2.5 mr-3 bg-white border border-gray-300 text-gray-800 font-semibold rounded-lg hover:bg-gray-100 transition-colors">Cancelar</button>
-          <button type="submit" className="px-5 py-2.5 bg-purple-600 text-white font-semibold rounded-lg hover:bg-purple-700 transition-colors">Salvar</button>
+          <button type="submit" className="px-5 py-2.5 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors">Salvar</button>
         </div>
       </form>
     </div>

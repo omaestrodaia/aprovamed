@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback } from 'react';
 import { UploadCloudIcon, FileTextIcon, XIcon } from './icons';
 
@@ -43,9 +44,9 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFileSelect, selectedFi
 
   if (selectedFile) {
     return (
-        <div className="p-4 bg-purple-50 border border-purple-200 rounded-xl flex items-center justify-between shadow-sm animate-fade-in">
+        <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl flex items-center justify-between shadow-sm animate-fade-in">
             <div className="flex items-center gap-3">
-                <FileTextIcon className="w-8 h-8 text-purple-600" />
+                <FileTextIcon className="w-8 h-8 text-blue-600" />
                 <div>
                     <p className="text-sm font-medium text-gray-800">{selectedFile.name}</p>
                     <p className="text-xs text-gray-500">{(selectedFile.size / 1024).toFixed(2)} KB</p>
@@ -69,7 +70,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFileSelect, selectedFi
         onDragEnter={handleDragEnter}
         onDragLeave={handleDragLeave}
         className={`flex flex-col items-center justify-center w-full p-12 border-2 border-dashed rounded-xl transition-colors duration-300 ${
-        isDragging ? 'border-purple-500 bg-purple-50' : 'border-gray-300 bg-white hover:border-gray-400'
+        isDragging ? 'border-blue-500 bg-blue-50' : 'border-gray-300 bg-white hover:border-gray-400'
         }`}
     >
         <input id="dropzone-file" type="file" className="hidden" onChange={handleFileChange} accept=".pdf,.docx,.xlsx,.txt,.md" />
@@ -78,7 +79,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFileSelect, selectedFi
                 <UploadCloudIcon className="w-8 h-8 text-gray-600" />
             </div>
             <p className="mb-2 text-md text-gray-600">
-                <span className="font-semibold text-purple-600">Arraste seu arquivo aqui</span>
+                <span className="font-semibold text-blue-600">Arraste seu arquivo aqui</span>
             </p>
             <p className="text-sm text-gray-500">ou clique para selecionar</p>
             <p className="text-xs text-gray-400 mt-2">Suportado: PDF, DOCX, XLSX (até 20MB)</p>

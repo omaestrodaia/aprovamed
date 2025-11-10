@@ -1,53 +1,118 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import { SparklesIcon, XIcon } from './icons';
+import { getChatResponse } from '../services/geminiService';
 
-const MessageSquareIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
-  <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-  </svg>
-);
+interface ChatWidgetProps {
+    currentPage: string;
+}
 
-const CloseIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
-    <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <line x1="18" y1="6" x2="6" y2="18"></line>
-        <line x1="6" y1="6" x2="18" y2="18"></line>
-    </svg>
-);
+type Message = {
+    role: 'user' | 'model';
+    text: string;
+}
 
-
-export const ChatWidget: React.FC = () => {
+export const ChatWidget: React.FC<ChatWidgetProps> = ({ currentPage }) => {
     const [isOpen, setIsOpen] = useState(false);
+    const [messages, setMessages] = useState<Message[]>([]);
+    const [input, setInput] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
+    const chatContainerRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if(chatContainerRef.current) {
+            chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+        }
+    }, [messages]);
+
+    const handleSend = async () => {
+        if (!input.trim() || isLoading) return;
+        
+        const userMessage: Message = { role: 'user', text: input };
+        setMessages(prev => [...prev, userMessage]);
+        setInput('');
+        setIsLoading(true);
+
+        const historyForApi = messages.map(m => ({
+            role: m.role,
+            parts: [{ text: m.text }]
+        }));
+        historyForApi.push({ role: 'user', parts: [{text: userMessage.text }]});
+
+        try {
+            const context = `O aluno está atualmente na página: ${currentPage}.`;
+            const responseText = await getChatResponse(historyForApi, context);
+            const modelMessage: Message = { role: 'model', text: responseText };
+            setMessages(prev => [...prev, modelMessage]);
+        } catch (e) {
+             const errorMessage: Message = { role: 'model', text: "Desculpe, ocorreu um erro." };
+             setMessages(prev => [...prev, errorMessage]);
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     if (!isOpen) {
         return (
             <button
                 onClick={() => setIsOpen(true)}
-                className="fixed bottom-6 right-6 bg-sky-600 text-white p-4 rounded-full shadow-lg hover:bg-sky-700 transition-transform transform hover:scale-110"
-                aria-label="Open chat"
+                className="fixed bottom-8 right-8 bg-blue-600 text-white rounded-full p-4 shadow-lg hover:bg-blue-700 transition-transform transform hover:scale-110"
+                title="Abrir assistente IA"
             >
-                <MessageSquareIcon className="w-6 h-6" />
+                <SparklesIcon className="w-8 h-8" />
             </button>
         );
     }
 
     return (
-        <div className="fixed bottom-6 right-6 w-96 h-[500px] bg-gray-800 border border-gray-700 rounded-xl shadow-2xl flex flex-col animate-fade-in-fast z-50">
-            <header className="flex justify-between items-center p-4 border-b border-gray-700">
-                <h3 className="font-bold text-white">Assistente AI</h3>
-                <button onClick={() => setIsOpen(false)} className="text-gray-400 hover:text-white">
-                    <CloseIcon className="w-5 h-5" />
+        <div className="fixed bottom-8 right-8 w-96 h-[600px] bg-white rounded-xl shadow-2xl flex flex-col border border-gray-200 animate-fade-in-fast z-50">
+            <div className="flex justify-between items-center p-4 border-b border-gray-200 bg-gray-50 rounded-t-xl">
+                <h3 className="font-bold text-gray-800 flex items-center gap-2">
+                    <SparklesIcon className="w-5 h-5 text-blue-600" />
+                    Assistente IA
+                </h3>
+                <button
+                    onClick={() => setIsOpen(false)}
+                    className="p-1 text-gray-500 hover:text-gray-800 rounded-full hover:bg-gray-200"
+                >
+                    <XIcon className="w-5 h-5" />
                 </button>
-            </header>
-            <div className="flex-1 p-4 text-center text-gray-500 flex items-center justify-center">
-                <p>Chat funcionalidade em construção.</p>
             </div>
-            <footer className="p-4 border-t border-gray-700">
-                <input
-                    type="text"
-                    placeholder="Pergunte algo..."
-                    className="w-full bg-gray-700 border border-gray-600 rounded-lg p-2.5 text-gray-200"
-                    disabled
-                />
-            </footer>
+            <div ref={chatContainerRef} className="flex-1 p-4 overflow-y-auto space-y-4">
+                 {messages.map((msg, index) => (
+                    <div key={index} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                        <div className={`max-w-[80%] p-3 rounded-2xl ${msg.role === 'user' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-800'}`}>
+                           {msg.text}
+                        </div>
+                    </div>
+                ))}
+                {isLoading && (
+                     <div className="flex justify-start">
+                        <div className="p-3 rounded-2xl bg-gray-200 text-gray-500">
+                           <div className="flex items-center space-x-1">
+                                <span className="h-2 w-2 bg-gray-400 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+                                <span className="h-2 w-2 bg-gray-400 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+                                <span className="h-2 w-2 bg-gray-400 rounded-full animate-bounce"></span>
+                           </div>
+                        </div>
+                    </div>
+                )}
+            </div>
+            <div className="p-4 border-t border-gray-200">
+                <div className="flex gap-2">
+                    <input
+                        type="text"
+                        placeholder="Pergunte algo..."
+                        value={input}
+                        onChange={(e) => setInput(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+                        className="flex-1 bg-gray-100 border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-blue-500"
+                        disabled={isLoading}
+                    />
+                    <button onClick={handleSend} disabled={isLoading} className="px-4 py-2 bg-blue-600 text-white rounded-lg disabled:opacity-50">
+                        Enviar
+                    </button>
+                </div>
+            </div>
         </div>
     );
 };

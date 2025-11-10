@@ -1,72 +1,151 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { User } from '../types';
-import { EditIcon, TrashIcon, SearchIcon, UsersIcon, PlusCircleIcon } from '../components/icons';
+import { supabase } from '../services/supabaseClient';
 import { StudentFormModal } from '../components/StudentFormModal';
+import { AssignCoursesModal } from '../components/AssignCoursesModal';
+import { PlusCircleIcon, SearchIcon, EditIcon, TrashIcon, UsersIcon, GraduationCapIcon } from '../components/icons';
 
-interface StudentManagementProps {
-    students: User[];
-    setStudents: React.Dispatch<React.SetStateAction<User[]>>;
-}
-
-const StudentManagement: React.FC<StudentManagementProps> = ({ students, setStudents }) => {
-    const [isModalOpen, setIsModalOpen] = useState(false);
+const StudentManagement: React.FC = () => {
+    const [students, setStudents] = useState<User[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [isFormModalOpen, setIsFormModalOpen] = useState(false);
+    const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
     const [editingStudent, setEditingStudent] = useState<User | null>(null);
+    const [studentToAssign, setStudentToAssign] = useState<User | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
 
-    const handleOpenModal = (student: User | null) => {
+    useEffect(() => {
+        fetchStudents();
+    }, []);
+
+    const fetchStudents = async () => {
+        setLoading(true);
+        try {
+            const { data: studentsData, error: studentsError } = await supabase
+                .from('alunos')
+                .select('*')
+                .order('name', { ascending: true });
+
+            if (studentsError) throw studentsError;
+
+            // Fetch all enrollments to count them on the client. More robust than a complex query.
+            const { data: enrollmentsData, error: enrollmentsError } = await supabase
+                .from('alunos_cursos')
+                .select('aluno_id');
+            
+            if (enrollmentsError) throw enrollmentsError;
+
+            const enrollmentCounts = (enrollmentsData || []).reduce((acc, enrollment) => {
+                acc[enrollment.aluno_id] = (acc[enrollment.aluno_id] || 0) + 1;
+                return acc;
+            }, {} as Record<string, number>);
+
+
+            const formattedData: User[] = (studentsData || []).map(student => ({
+                id: student.id,
+                name: student.name,
+                email: student.email,
+                role: 'student',
+                avatarUrl: student.avatar_url || `https://i.pravatar.cc/150?u=${student.id}`,
+                registrationDate: student.registration_date,
+                status: student.status,
+                enrolledCoursesCount: enrollmentCounts[student.id] || 0,
+            }));
+            setStudents(formattedData);
+        } catch (error) {
+            console.error('Error fetching students:', error instanceof Error ? error.message : JSON.stringify(error));
+            setStudents([]);
+        }
+        setLoading(false);
+    };
+
+    const handleOpenFormModal = (student: User | null = null) => {
         setEditingStudent(student);
-        setIsModalOpen(true);
+        setIsFormModalOpen(true);
+    };
+    
+    const handleOpenAssignModal = (student: User) => {
+        setStudentToAssign(student);
+        setIsAssignModalOpen(true);
     };
 
     const handleCloseModal = () => {
+        setIsFormModalOpen(false);
         setEditingStudent(null);
-        setIsModalOpen(false);
     };
 
-    const handleSaveStudent = (formData: Omit<User, 'id' | 'role' | 'avatarUrl' | 'registrationDate'>) => {
+    const handleSaveStudent = async (studentData: Omit<User, 'id' | 'role' | 'avatarUrl' | 'registrationDate'>) => {
         if (editingStudent) {
             // Update existing student
-            setStudents(prev => prev.map(s => s.id === editingStudent.id ? { ...editingStudent, ...formData } : s));
+            const { data, error } = await supabase
+                .from('alunos')
+                .update({ name: studentData.name, email: studentData.email, status: studentData.status })
+                .eq('id', editingStudent.id)
+                .select()
+                .single();
+
+            if (error) {
+                alert('Erro ao atualizar aluno: ' + error.message);
+            } else if (data) {
+                // To update the UI correctly, we refetch all students
+                fetchStudents();
+            }
         } else {
-            // Add new student
-            const newUser: User = {
-                id: `student-${Date.now()}`,
-                ...formData,
-                role: 'student',
-                avatarUrl: `https://i.pravatar.cc/150?u=${Date.now()}`,
-                registrationDate: new Date().toISOString().split('T')[0],
-            };
-            setStudents(prev => [newUser, ...prev]);
+            // Create new student
+            const { data, error } = await supabase
+                .from('alunos')
+                .insert([{
+                    name: studentData.name,
+                    email: studentData.email,
+                    status: studentData.status,
+                }])
+                .select()
+                .single();
+
+            if (error) {
+                alert(`Erro ao adicionar aluno: ${error.message}`);
+            } else if (data) {
+                // To update the UI correctly, we refetch all students
+                fetchStudents();
+            }
         }
+        handleCloseModal();
     };
 
-    const handleDeleteStudent = (studentId: string) => {
+
+    const handleDeleteStudent = async (studentId: string) => {
         if (window.confirm('Tem certeza que deseja remover este aluno? Esta ação não pode ser desfeita.')) {
-            setStudents(prev => prev.filter(s => s.id !== studentId));
+            const { error } = await supabase.from('alunos').delete().eq('id', studentId);
+            if (error) {
+                alert('Erro ao deletar aluno: ' + error.message);
+            } else {
+                setStudents(prev => prev.filter(s => s.id !== studentId));
+            }
         }
     };
 
     const filteredStudents = useMemo(() => {
-        if (!searchTerm) return students;
-        return students.filter(
-            s => s.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                 s.email.toLowerCase().includes(searchTerm.toLowerCase())
+        return students.filter(student =>
+            student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            student.email.toLowerCase().includes(searchTerm.toLowerCase())
         );
     }, [students, searchTerm]);
 
-    const formatDate = (dateString: string) => {
-        return new Date(dateString).toLocaleDateString('pt-BR', {
-            day: '2-digit', month: '2-digit', year: 'numeric'
-        });
-    }
+    const formatDate = (dateString: string) => new Date(dateString).toLocaleDateString('pt-BR');
 
     return (
         <div className="space-y-8 animate-fade-in">
-            <StudentFormModal 
-                isOpen={isModalOpen}
+            <StudentFormModal
+                isOpen={isFormModalOpen}
                 onClose={handleCloseModal}
                 onSave={handleSaveStudent}
                 student={editingStudent}
+            />
+            <AssignCoursesModal 
+                student={studentToAssign}
+                isOpen={isAssignModalOpen}
+                onClose={() => setIsAssignModalOpen(false)}
+                onSaveSuccess={fetchStudents}
             />
 
             <header>
@@ -82,23 +161,27 @@ const StudentManagement: React.FC<StudentManagementProps> = ({ students, setStud
                             type="text"
                             placeholder="Buscar por nome ou e-mail..."
                             value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full bg-white border border-gray-300 rounded-lg p-2.5 pl-10 text-gray-800 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                            onChange={e => setSearchTerm(e.target.value)}
+                            className="w-full bg-white border border-gray-300 rounded-lg p-2.5 pl-10 text-gray-800 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         />
                     </div>
-                    <button onClick={() => handleOpenModal(null)} className="w-full md:w-auto px-5 py-2.5 bg-purple-600 text-white font-semibold rounded-lg hover:bg-purple-700 transition-colors flex items-center justify-center space-x-2">
+                    <button onClick={() => handleOpenFormModal()} className="w-full md:w-auto px-5 py-2.5 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 flex items-center justify-center space-x-2">
                         <PlusCircleIcon className="w-5 h-5" />
-                        <span>Adicionar Novo Aluno</span>
+                        <span>Adicionar Aluno</span>
                     </button>
                 </div>
                 
                 <div className="overflow-x-auto">
+                    {loading ? (
+                         <div className="text-center py-16 text-gray-500">Carregando alunos...</div>
+                    ) : (
                     <table className="w-full text-left">
                         <thead className="bg-gray-50">
                             <tr>
                                 <th className="p-4 font-semibold text-sm text-gray-600">Aluno</th>
                                 <th className="p-4 font-semibold text-sm text-gray-600">Data de Cadastro</th>
                                 <th className="p-4 font-semibold text-sm text-gray-600">Status</th>
+                                <th className="p-4 font-semibold text-sm text-gray-600 text-center">Cursos Matriculados</th>
                                 <th className="p-4 font-semibold text-sm text-gray-600 text-right">Ações</th>
                             </tr>
                         </thead>
@@ -116,13 +199,21 @@ const StudentManagement: React.FC<StudentManagementProps> = ({ students, setStud
                                     </td>
                                     <td className="p-4 text-gray-600">{formatDate(student.registrationDate)}</td>
                                     <td className="p-4">
-                                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${student.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+                                        <span className={`px-2.5 py-1 text-xs font-semibold rounded-full ${student.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
                                             {student.status === 'active' ? 'Ativo' : 'Inativo'}
+                                        </span>
+                                    </td>
+                                     <td className="p-4 text-center">
+                                        <span className="px-2.5 py-1 text-sm font-semibold bg-gray-100 text-gray-800 rounded-full">
+                                            {student.enrolledCoursesCount}
                                         </span>
                                     </td>
                                     <td className="p-4">
                                         <div className="flex items-center space-x-1 justify-end">
-                                            <button onClick={() => handleOpenModal(student)} className="p-2 rounded-md text-gray-500 hover:text-purple-600 hover:bg-purple-100 transition-colors" title="Editar">
+                                             <button onClick={() => handleOpenAssignModal(student)} className="p-2 rounded-md text-gray-500 hover:text-green-600 hover:bg-green-100 transition-colors" title="Matricular em cursos">
+                                                <GraduationCapIcon className="w-5 h-5"/>
+                                            </button>
+                                            <button onClick={() => handleOpenFormModal(student)} className="p-2 rounded-md text-gray-500 hover:text-blue-600 hover:bg-blue-100 transition-colors" title="Editar">
                                                 <EditIcon className="w-5 h-5"/>
                                             </button>
                                             <button onClick={() => handleDeleteStudent(student.id)} className="p-2 rounded-md text-gray-500 hover:text-red-600 hover:bg-red-100 transition-colors" title="Remover">
@@ -134,11 +225,12 @@ const StudentManagement: React.FC<StudentManagementProps> = ({ students, setStud
                             ))}
                         </tbody>
                     </table>
-                     {filteredStudents.length === 0 && (
+                    )}
+                    {!loading && filteredStudents.length === 0 && (
                         <div className="text-center py-16">
                             <UsersIcon className="w-12 h-12 mx-auto text-gray-400 mb-4"/>
-                            <p className="text-gray-500 font-semibold">Nenhum aluno cadastrado.</p>
-                             <p className="text-gray-500 text-sm">Clique em "Adicionar Novo Aluno" para começar.</p>
+                            <p className="text-gray-500 font-semibold">Nenhum aluno encontrado.</p>
+                             <p className="text-gray-500 text-sm">{searchTerm ? 'Tente um termo de busca diferente.' : 'Clique em "Adicionar Aluno" para começar.'}</p>
                         </div>
                     )}
                 </div>

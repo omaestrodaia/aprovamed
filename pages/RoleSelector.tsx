@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Role } from '../types';
 import { BrainCircuitIcon } from '../components/icons';
@@ -9,9 +10,9 @@ interface RoleSelectorProps {
 const RoleCard: React.FC<{ title: string; description: string; onClick: () => void }> = ({ title, description, onClick }) => (
     <button 
         onClick={onClick}
-        className="w-full max-w-sm p-8 bg-white border border-gray-200 rounded-xl text-center hover:border-purple-300 hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1"
+        className="w-full max-w-sm p-8 bg-white border border-gray-200 rounded-xl text-center hover:border-blue-300 hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1"
     >
-        <h3 className="text-2xl font-bold text-purple-600">{title}</h3>
+        <h3 className="text-2xl font-bold text-blue-600">{title}</h3>
         <p className="mt-2 text-gray-500">{description}</p>
     </button>
 );
@@ -20,10 +21,7 @@ export const RoleSelector: React.FC<RoleSelectorProps> = ({ onSelectRole }) => {
     return (
         <div className="min-h-screen bg-gray-50 flex flex-col justify-center items-center p-4">
             <div className="text-center mb-12">
-                <div className="bg-purple-100 p-4 rounded-full inline-block mb-4">
-                    <BrainCircuitIcon className="w-12 h-12 text-purple-600 mx-auto" />
-                </div>
-                <h1 className="text-4xl md:text-5xl font-bold text-gray-900">Bem-vindo à StudyPlatform</h1>
+                <img src="https://i.imgur.com/4I15n6c.png" alt="AprovaMed Logo" className="h-20 mx-auto mb-6" />
                 <p className="mt-4 text-lg text-gray-600 max-w-2xl mx-auto">Sua plataforma de aprendizado inteligente. Escolha seu perfil para começar.</p>
             </div>
             <div className="flex flex-col md:flex-row gap-8">

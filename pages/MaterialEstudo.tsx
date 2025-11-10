@@ -1,17 +1,20 @@
-import React, { useState } from 'react';
-import { MaterialEstudo, Disciplina, Assunto } from '../types';
-import { PlusCircleIcon, BookCopyIcon, FileTextIcon, TrashIcon, EditIcon } from '../components/icons';
 
-interface MaterialEstudoProps {
-    material: MaterialEstudo[];
-    setMaterial: React.Dispatch<React.SetStateAction<MaterialEstudo[]>>;
-    disciplinas: Disciplina[];
-    assuntos: Assunto[];
-}
+
+
+
+import React, { useState, useEffect } from 'react';
+import { MaterialEstudo, Disciplina, Assunto } from '../types';
+import { PlusCircleIcon, BookCopyIcon, TrashIcon, EditIcon } from '../components/icons';
+import { supabase } from '../services/supabaseClient';
 
 type MaterialTipo = 'pdf' | 'ppt' | 'video';
 
-const MaterialEstudo: React.FC<MaterialEstudoProps> = ({ material, setMaterial, disciplinas, assuntos }) => {
+const MaterialEstudo: React.FC = () => {
+    const [material, setMaterial] = useState<MaterialEstudo[]>([]);
+    const [disciplinas, setDisciplinas] = useState<Disciplina[]>([]);
+    const [assuntos, setAssuntos] = useState<Assunto[]>([]);
+    const [loading, setLoading] = useState(true);
+
     const [isFormVisible, setIsFormVisible] = useState(false);
     const [titulo, setTitulo] = useState('');
     const [tipo, setTipo] = useState<MaterialTipo>('pdf');
@@ -19,35 +22,76 @@ const MaterialEstudo: React.FC<MaterialEstudoProps> = ({ material, setMaterial, 
     const [disciplinaId, setDisciplinaId] = useState('');
     const [assuntoId, setAssuntoId] = useState('');
 
-    const handleAddMaterial = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (titulo.trim() && disciplinaId && assuntoId && (tipo === 'video' ? url.trim() : true)) {
-            const newMaterial: MaterialEstudo = {
-                id: `mat-${Date.now()}`,
-                titulo,
-                tipo,
-                url,
-                disciplinaId,
-                assuntoId,
-            };
-            setMaterial(prev => [newMaterial, ...prev]);
-            // Reset form
-            setIsFormVisible(false);
-            setTitulo('');
-            setTipo('pdf');
-            setUrl('');
-            setDisciplinaId('');
-            setAssuntoId('');
-        }
-    };
-    
-    const handleDeleteMaterial = (id: string) => {
-        if(window.confirm('Tem certeza que deseja remover este material?')) {
-            setMaterial(prev => prev.filter(m => m.id !== id));
+    useEffect(() => {
+        fetchData();
+    }, []);
+
+    const fetchData = async () => {
+        setLoading(true);
+        try {
+            const { data: matData, error: matError } = await supabase.from('materiais_estudo').select('*');
+            if (matError) throw matError;
+            setMaterial(matData || []);
+            
+            const { data: discData, error: discError } = await supabase.from('disciplinas').select('*');
+            if (discError) throw discError;
+            setDisciplinas(discData || []);
+            
+            const { data: assData, error: assError } = await supabase.from('assuntos').select('*');
+            if (assError) throw assError;
+            setAssuntos(assData || []);
+
+        } catch(e: any) {
+            console.error("Error fetching materials data:", e.message);
+        } finally {
+            setLoading(false);
         }
     }
 
-    const assuntosFiltrados = disciplinaId ? assuntos.filter(a => a.disciplinaId === disciplinaId) : [];
+
+    const handleAddMaterial = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (titulo.trim() && disciplinaId && assuntoId && (tipo === 'video' ? url.trim() : true)) {
+            const newMaterialData = {
+                titulo,
+                tipo,
+                url,
+                disciplina_id: disciplinaId,
+                assunto_id: assuntoId,
+            };
+
+            const { data, error } = await supabase
+                .from('materiais_estudo')
+                .insert(newMaterialData)
+                .select();
+            
+            if (error) {
+                alert('Erro ao adicionar material: ' + error.message);
+            } else if (data) {
+                setMaterial(prev => [data[0], ...prev]);
+                // Reset form
+                setIsFormVisible(false);
+                setTitulo('');
+                setTipo('pdf');
+                setUrl('');
+                setDisciplinaId('');
+                setAssuntoId('');
+            }
+        }
+    };
+    
+    const handleDeleteMaterial = async (id: string) => {
+        if(window.confirm('Tem certeza que deseja remover este material?')) {
+            const { error } = await supabase.from('materiais_estudo').delete().eq('id', id);
+            if(error) {
+                alert('Erro ao deletar material: ' + error.message);
+            } else {
+                setMaterial(prev => prev.filter(m => m.id !== id));
+            }
+        }
+    }
+
+    const assuntosFiltrados = disciplinaId ? assuntos.filter(a => a.disciplina_id === disciplinaId) : [];
 
     const getTypeName = (type: MaterialTipo) => {
         switch (type) {
@@ -66,7 +110,7 @@ const MaterialEstudo: React.FC<MaterialEstudoProps> = ({ material, setMaterial, 
 
             <div className="bg-white border border-gray-200 rounded-xl p-5">
                 <div className="flex justify-end items-center mb-5">
-                    <button onClick={() => setIsFormVisible(!isFormVisible)} className="px-5 py-2.5 bg-purple-600 text-white font-semibold rounded-lg hover:bg-purple-700 transition-colors flex items-center justify-center space-x-2">
+                    <button onClick={() => setIsFormVisible(!isFormVisible)} className="px-5 py-2.5 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center space-x-2">
                         <PlusCircleIcon className="w-5 h-5" />
                         <span>{isFormVisible ? 'Cancelar' : 'Adicionar Material'}</span>
                     </button>
@@ -112,7 +156,7 @@ const MaterialEstudo: React.FC<MaterialEstudoProps> = ({ material, setMaterial, 
                              ) : (
                                 <>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">Arquivo</label>
-                                    <input type="file" accept={tipo === 'pdf' ? '.pdf' : '.ppt,.pptx'} className="w-full file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100"/>
+                                    <input type="file" accept={tipo === 'pdf' ? '.pdf' : '.ppt,.pptx'} className="w-full file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
                                 </>
                              )}
                         </div>
@@ -123,6 +167,9 @@ const MaterialEstudo: React.FC<MaterialEstudoProps> = ({ material, setMaterial, 
                 )}
                 
                 <div className="overflow-x-auto">
+                    {loading ? (
+                         <div className="text-center py-16 text-gray-500">Carregando materiais...</div>
+                    ) : (
                     <table className="w-full text-left">
                         <thead className="bg-gray-50">
                             <tr>
@@ -138,11 +185,11 @@ const MaterialEstudo: React.FC<MaterialEstudoProps> = ({ material, setMaterial, 
                                     <td className="p-4 font-medium text-gray-900">{mat.titulo}</td>
                                     <td className="p-4 text-gray-600">{getTypeName(mat.tipo)}</td>
                                     <td className="p-4 text-sm text-gray-600">
-                                        {disciplinas.find(d => d.id === mat.disciplinaId)?.descricao || 'N/A'} / {assuntos.find(a => a.id === mat.assuntoId)?.descricao || 'N/A'}
+                                        {disciplinas.find(d => d.id === mat.disciplina_id)?.descricao || 'N/A'} / {assuntos.find(a => a.id === mat.assunto_id)?.descricao || 'N/A'}
                                     </td>
                                     <td className="p-4">
                                         <div className="flex items-center space-x-1 justify-end">
-                                            <button className="p-2 rounded-md text-gray-500 hover:text-purple-600 hover:bg-purple-100" title="Editar"><EditIcon className="w-5 h-5"/></button>
+                                            <button className="p-2 rounded-md text-gray-500 hover:text-blue-600 hover:bg-blue-100" title="Editar"><EditIcon className="w-5 h-5"/></button>
                                             <button onClick={() => handleDeleteMaterial(mat.id)} className="p-2 rounded-md text-gray-500 hover:text-red-600 hover:bg-red-100" title="Remover"><TrashIcon className="w-5 h-5"/></button>
                                         </div>
                                     </td>
@@ -150,7 +197,8 @@ const MaterialEstudo: React.FC<MaterialEstudoProps> = ({ material, setMaterial, 
                             ))}
                         </tbody>
                     </table>
-                    {material.length === 0 && (
+                    )}
+                    {!loading && material.length === 0 && (
                         <div className="text-center py-16">
                             <BookCopyIcon className="w-12 h-12 mx-auto text-gray-400 mb-4"/>
                             <p className="text-gray-500 font-semibold">Nenhum material de estudo cadastrado.</p>
@@ -159,7 +207,7 @@ const MaterialEstudo: React.FC<MaterialEstudoProps> = ({ material, setMaterial, 
                     )}
                 </div>
             </div>
-            <style jsx>{`
+            <style>{`
                 .input-style {
                     background-color: white;
                     border: 1px solid #D1D5DB;
@@ -168,11 +216,11 @@ const MaterialEstudo: React.FC<MaterialEstudoProps> = ({ material, setMaterial, 
                     color: #1F2937;
                 }
                 .input-style:focus {
-                    --tw-ring-color: #8B5CF6;
+                    --tw-ring-color: #3B82F6;
                     --tw-ring-offset-shadow: var(--tw-ring-inset) 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color);
                     --tw-ring-shadow: var(--tw-ring-inset) 0 0 0 calc(2px + var(--tw-ring-offset-width)) var(--tw-ring-color);
                     box-shadow: var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow, 0 0 #0000);
-                    border-color: #8B5CF6;
+                    border-color: #3B82F6;
                 }
                  .input-style:disabled {
                     opacity: 0.5;

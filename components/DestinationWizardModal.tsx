@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { ClassbuildSettings, Disciplina, Assunto } from '../types';
 import { createDisciplina, createAssunto } from '../services/classbuildService';
@@ -115,14 +116,14 @@ export const DestinationWizardModal: React.FC<DestinationWizardModalProps> = ({
                 type="text"
                 value={disciplinaName}
                 onChange={e => setDisciplinaName(e.target.value)}
-                className="w-full bg-white border border-gray-300 rounded-md p-3 text-gray-800 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                className="w-full bg-white border border-gray-300 rounded-md p-3 text-gray-800 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 placeholder="Ex: Cardiologia"
               />
               {filteredDisciplinas.length > 0 && (
                 <div className="max-h-32 overflow-y-auto bg-gray-100 rounded-md p-2 space-y-1">
                     <p className="text-xs text-gray-500 px-2">Sugestões da sessão:</p>
                     {filteredDisciplinas.map(d => (
-                        <button key={d.id} onClick={() => { setSelectedDisciplina(d); setStep('assunto'); }} className="w-full text-left px-3 py-2 text-gray-800 hover:bg-purple-100 rounded-md">
+                        <button key={d.id} onClick={() => { setSelectedDisciplina(d); setStep('assunto'); }} className="w-full text-left px-3 py-2 text-gray-800 hover:bg-blue-100 rounded-md">
                             {d.descricao}
                         </button>
                     ))}
@@ -134,19 +135,19 @@ export const DestinationWizardModal: React.FC<DestinationWizardModalProps> = ({
           {step === 'assunto' && selectedDisciplina && (
              <div className="space-y-4">
               <label className="block text-lg font-semibold text-gray-800">Passo 2: Defina o Assunto</label>
-              <p className="text-sm text-gray-600">Agora, crie um assunto para a disciplina <span className="font-bold text-purple-600">"{selectedDisciplina.descricao}"</span>.</p>
+              <p className="text-sm text-gray-600">Agora, crie um assunto para a disciplina <span className="font-bold text-blue-600">"{selectedDisciplina.descricao}"</span>.</p>
                <input
                 type="text"
                 value={assuntoName}
                 onChange={e => setAssuntoName(e.target.value)}
-                className="w-full bg-white border border-gray-300 rounded-md p-3 text-gray-800 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                className="w-full bg-white border border-gray-300 rounded-md p-3 text-gray-800 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 placeholder="Ex: Arritmias"
               />
                {filteredAssuntos.length > 0 && (
                 <div className="max-h-32 overflow-y-auto bg-gray-100 rounded-md p-2 space-y-1">
                     <p className="text-xs text-gray-500 px-2">Sugestões da sessão para esta disciplina:</p>
                     {filteredAssuntos.map(a => (
-                        <button key={a.id} onClick={() => { setSelectedAssunto(a); setStep('confirm'); }} className="w-full text-left px-3 py-2 text-gray-800 hover:bg-purple-100 rounded-md">
+                        <button key={a.id} onClick={() => { setSelectedAssunto(a); setStep('confirm'); }} className="w-full text-left px-3 py-2 text-gray-800 hover:bg-blue-100 rounded-md">
                             {a.descricao}
                         </button>
                     ))}
@@ -162,8 +163,8 @@ export const DestinationWizardModal: React.FC<DestinationWizardModalProps> = ({
                     Você está pronto para enviar as questões selecionadas para o seguinte destino:
                  </p>
                  <div className="bg-gray-100 p-4 rounded-lg space-y-2 text-left">
-                    <p><span className="font-semibold text-gray-500">Disciplina:</span> <span className="font-bold text-purple-600">{selectedDisciplina.descricao}</span></p>
-                    <p><span className="font-semibold text-gray-500">Assunto:</span> <span className="font-bold text-purple-600">{selectedAssunto.descricao}</span></p>
+                    <p><span className="font-semibold text-gray-500">Disciplina:</span> <span className="font-bold text-blue-600">{selectedDisciplina.descricao}</span></p>
+                    <p><span className="font-semibold text-gray-500">Assunto:</span> <span className="font-bold text-blue-600">{selectedAssunto.descricao}</span></p>
                  </div>
             </div>
           )}
@@ -177,8 +178,8 @@ export const DestinationWizardModal: React.FC<DestinationWizardModalProps> = ({
             </div>
             <div className="flex justify-end">
                 <button onClick={resetState} className="px-5 py-2.5 mr-3 bg-white border border-gray-300 text-gray-800 font-semibold rounded-lg hover:bg-gray-100 transition-colors">Cancelar</button>
-                {step === 'disciplina' && <button onClick={handleDisciplinaSubmit} disabled={!disciplinaName.trim() || isLoading} className="w-32 px-5 py-2.5 bg-purple-600 text-white font-semibold rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 flex justify-center items-center">{isLoading ? <Spinner /> : "Avançar"}</button>}
-                {step === 'assunto' && <button onClick={handleAssuntoSubmit} disabled={!assuntoName.trim() || isLoading} className="w-32 px-5 py-2.5 bg-purple-600 text-white font-semibold rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 flex justify-center items-center">{isLoading ? <Spinner /> : "Avançar"}</button>}
+                {step === 'disciplina' && <button onClick={handleDisciplinaSubmit} disabled={!disciplinaName.trim() || isLoading} className="w-32 px-5 py-2.5 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 flex justify-center items-center">{isLoading ? <Spinner /> : "Avançar"}</button>}
+                {step === 'assunto' && <button onClick={handleAssuntoSubmit} disabled={!assuntoName.trim() || isLoading} className="w-32 px-5 py-2.5 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 flex justify-center items-center">{isLoading ? <Spinner /> : "Avançar"}</button>}
                 {step === 'confirm' && <button onClick={handleFinish} className="px-5 py-2.5 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 transition-colors">Confirmar e Enviar</button>}
             </div>
         </div>

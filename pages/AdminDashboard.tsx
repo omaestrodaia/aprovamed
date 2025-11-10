@@ -1,11 +1,8 @@
-import React from 'react';
-import { User, StudentProgress, Test } from '../types';
+import React, { useState, useEffect } from 'react';
 import { UsersIcon, CheckCircleIcon, BarChartIcon, BookOpenIcon, EditIcon, TrendingUpIcon, FileQuestionIcon } from '../components/icons';
+import { supabase } from '../services/supabaseClient';
 
 interface AdminDashboardProps {
-    students: User[];
-    studentProgress: StudentProgress[];
-    tests: Test[];
     setCurrentPage: (page: string) => void;
 }
 
@@ -22,16 +19,44 @@ const MetricCard: React.FC<{ icon: React.ReactNode; label: string; value: number
 );
 
 const ActionCard: React.FC<{ icon: React.ReactNode; label: string; onClick: () => void; }> = ({ icon, label, onClick }) => (
-    <button onClick={onClick} className="bg-white border border-gray-200 rounded-lg p-5 flex flex-col items-center justify-center text-center hover:shadow-md hover:border-purple-300 transition-all transform hover:-translate-y-1">
+    <button onClick={onClick} className="bg-white border border-gray-200 rounded-lg p-5 flex flex-col items-center justify-center text-center hover:shadow-md hover:border-blue-300 transition-all transform hover:-translate-y-1">
          {icon}
         <p className="text-gray-700 font-semibold mt-2">{label}</p>
     </button>
 );
 
 
-const AdminDashboard: React.FC<AdminDashboardProps> = ({ students, studentProgress, tests, setCurrentPage }) => {
-    const studentCount = students.length;
-    const scheduledTests = tests.length;
+const AdminDashboard: React.FC<AdminDashboardProps> = ({ setCurrentPage }) => {
+    const [stats, setStats] = useState({ studentCount: 0, questionCount: 0, testCount: 0 });
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchStats = async () => {
+            setLoading(true);
+            try {
+                const { count: studentCount, error: studentError } = await supabase.from('alunos').select('*', { count: 'exact', head: true });
+                if (studentError) throw studentError;
+
+                const { count: questionCount, error: questionError } = await supabase.from('questoes').select('*', { count: 'exact', head: true });
+                if (questionError) throw questionError;
+
+                const { count: testCount, error: testError } = await supabase.from('testes').select('*', { count: 'exact', head: true });
+                if (testError) throw testError;
+
+                setStats({ 
+                    studentCount: studentCount ?? 0, 
+                    questionCount: questionCount ?? 0, 
+                    testCount: testCount ?? 0 
+                });
+            } catch (error) {
+                console.error("Error fetching dashboard stats:", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchStats();
+    }, []);
 
   return (
     <div className="space-y-8 animate-fade-in">
@@ -44,25 +69,25 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ students, studentProgre
         <MetricCard
             icon={<UsersIcon className="w-6 h-6 text-blue-600" />}
             label="Total de Alunos"
-            value={studentCount}
+            value={loading ? '...' : stats.studentCount}
             iconBgColor="bg-blue-100"
         />
         <MetricCard
             icon={<BookOpenIcon className="w-6 h-6 text-green-600" />}
             label="Questões Cadastradas"
-            value={84} // Mocked value from screenshot
+            value={loading ? '...' : stats.questionCount}
             iconBgColor="bg-green-100"
         />
         <MetricCard
-            icon={<CheckCircleIcon className="w-6 h-6 text-purple-600" />}
+            icon={<CheckCircleIcon className="w-6 h-6 text-blue-600" />}
             label="Testes Agendados"
-            value={scheduledTests}
-            iconBgColor="bg-purple-100"
+            value={loading ? '...' : stats.testCount}
+            iconBgColor="bg-blue-100"
         />
         <MetricCard
             icon={<TrendingUpIcon className="w-6 h-6 text-orange-600" />}
             label="Tentativas de Testes"
-            value={0} // Mocked value from screenshot
+            value={0} // Placeholder, as this requires a 'tentativas' table
             iconBgColor="bg-orange-100"
         />
       </div>
@@ -71,7 +96,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ students, studentProgre
         <h2 className="text-xl font-bold text-gray-800 mb-4">Ações Rápidas</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
             <ActionCard icon={<FileQuestionIcon className="w-8 h-8 text-gray-500"/>} label="Upload Questões" onClick={() => setCurrentPage('upload-questions')} />
-            <ActionCard icon={<EditIcon className="w-8 h-8 text-purple-500"/>} label="Criar Teste" onClick={() => setCurrentPage('tests')} />
+            <ActionCard icon={<EditIcon className="w-8 h-8 text-blue-500"/>} label="Criar Teste" onClick={() => setCurrentPage('tests')} />
             <ActionCard icon={<UsersIcon className="w-8 h-8 text-green-500"/>} label="Gerenciar Turmas" onClick={() => alert('Funcionalidade de Turmas em breve!')} />
             <ActionCard icon={<BarChartIcon className="w-8 h-8 text-orange-500"/>} label="Ver CRM" onClick={() => setCurrentPage('students')} />
         </div>

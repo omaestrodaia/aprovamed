@@ -1,184 +1,180 @@
-import React, { useState, useMemo } from 'react';
-import { Disciplina, Assunto, Modulo } from '../types';
-import { GraduationCapIcon, EditIcon, TrashIcon, PlusCircleIcon, BookOpenIcon } from '../components/icons';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Curso, Modulo, Disciplina, Assunto } from '../types';
+import { supabase } from '../services/supabaseClient';
+import { AcademicItemFormModal } from '../components/AcademicItemFormModal';
+import { PlusCircleIcon, EditIcon, TrashIcon, FolderKanbanIcon } from '../components/icons';
 
-interface AcademicManagementProps {
-    page: string;
-    modulos: Modulo[];
-    disciplinas: Disciplina[];
-    setDisciplinas: React.Dispatch<React.SetStateAction<Disciplina[]>>;
-    assuntos: Assunto[];
-    setAssuntos: React.Dispatch<React.SetStateAction<Assunto[]>>;
-}
+type AcademicItem = Curso | Modulo | Disciplina | Assunto;
+type ItemType = 'curso' | 'modulo' | 'disciplina' | 'assunto';
 
-const AcademicManagement: React.FC<AcademicManagementProps> = ({ page, modulos, disciplinas, setDisciplinas, assuntos, setAssuntos }) => {
-    const [selectedModulo, setSelectedModulo] = useState<Modulo | null>(modulos[0] || null);
-    const [selectedDisciplina, setSelectedDisciplina] = useState<Disciplina | null>(null);
-    const [newDisciplinaName, setNewDisciplinaName] = useState('');
-    const [newAssuntoName, setNewAssuntoName] = useState('');
+const AcademicManagement: React.FC = () => {
+    const [activeTab, setActiveTab] = useState<ItemType>('curso');
+    const [items, setItems] = useState<AcademicItem[]>([]);
+    const [cursos, setCursos] = useState<Curso[]>([]);
+    const [modulos, setModulos] = useState<Modulo[]>([]);
+    const [disciplinas, setDisciplinas] = useState<Disciplina[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [editingItem, setEditingItem] = useState<AcademicItem | null>(null);
 
-    const isDisciplinaMode = page === 'disciplinas';
+    const tables: Record<ItemType, string> = {
+        curso: 'cursos',
+        modulo: 'modulos',
+        disciplina: 'disciplinas',
+        assunto: 'assuntos',
+    };
 
-    const handleAddDisciplina = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (newDisciplinaName.trim() && selectedModulo) {
-            const newDisciplina: Disciplina = {
-                id: `d-${Date.now()}`,
-                moduloId: selectedModulo.id,
-                descricao: newDisciplinaName.trim()
-            };
-            setDisciplinas(prev => [...prev, newDisciplina]);
-            setNewDisciplinaName('');
+    useEffect(() => {
+        fetchAllData();
+    }, []);
+
+    useEffect(() => {
+        fetchItems(activeTab);
+    }, [activeTab]);
+
+    const fetchAllData = async () => {
+        setLoading(true);
+        try {
+            const [cursosRes, modulosRes, disciplinasRes] = await Promise.all([
+                supabase.from('cursos').select('*'),
+                supabase.from('modulos').select('*'),
+                supabase.from('disciplinas').select('*'),
+            ]);
+            if (cursosRes.error) throw cursosRes.error;
+            setCursos(cursosRes.data);
+            if (modulosRes.error) throw modulosRes.error;
+            setModulos(modulosRes.data);
+            if (disciplinasRes.error) throw disciplinasRes.error;
+            setDisciplinas(disciplinasRes.data);
+        } catch (error) {
+            console.error("Error fetching all academic data:", error);
+        }
+        setLoading(false);
+    };
+
+    const fetchItems = async (type: ItemType) => {
+        setLoading(true);
+        const { data, error } = await supabase.from(tables[type]).select('*').order('descricao', { ascending: true });
+        if (error) {
+            console.error(`Error fetching ${type}s:`, error);
+            setItems([]);
+        } else {
+            setItems(data);
+        }
+        setLoading(false);
+    };
+
+    const getParentName = (item: AcademicItem) => {
+        if ('curso_id' in item && item.curso_id) {
+            return cursos.find(c => c.id === item.curso_id)?.descricao || 'N/A';
+        }
+        if ('modulo_id' in item && item.modulo_id) {
+            return modulos.find(m => m.id === item.modulo_id)?.descricao || 'N/A';
+        }
+        if ('disciplina_id' in item && item.disciplina_id) {
+            return disciplinas.find(d => d.id === item.disciplina_id)?.descricao || 'N/A';
+        }
+        return null;
+    };
+    
+    const handleSave = async (itemData: { descricao: string, parentId?: string }) => {
+        const payload: any = { descricao: itemData.descricao };
+        if(itemData.parentId) {
+             switch(activeTab) {
+                case 'modulo': payload.curso_id = itemData.parentId; break;
+                case 'disciplina': payload.modulo_id = itemData.parentId; break;
+                case 'assunto': payload.disciplina_id = itemData.parentId; break;
+            }
+        }
+
+        if (editingItem) {
+            const { error } = await supabase.from(tables[activeTab]).update(payload).eq('id', editingItem.id);
+            if (error) alert(`Erro ao atualizar: ${error.message}`);
+        } else {
+            const { error } = await supabase.from(tables[activeTab]).insert([payload]);
+            if (error) alert(`Erro ao criar: ${error.message}`);
+        }
+        fetchItems(activeTab);
+        fetchAllData(); // Re-fetch all data to update parent names
+        setIsModalOpen(false);
+        setEditingItem(null);
+    };
+    
+    const handleDelete = async (id: string) => {
+        if (window.confirm('Tem certeza? A remoção pode afetar itens dependentes.')) {
+            const { error } = await supabase.from(tables[activeTab]).delete().eq('id', id);
+            if (error) alert(`Erro ao deletar: ${error.message}`);
+            else fetchItems(activeTab);
         }
     };
     
-    const handleAddAssunto = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (newAssuntoName.trim() && selectedDisciplina) {
-            const newAssunto: Assunto = {
-                id: `a-${Date.now()}`,
-                disciplinaId: selectedDisciplina.id,
-                descricao: newAssuntoName.trim()
-            };
-            setAssuntos(prev => [...prev, newAssunto]);
-            setNewAssuntoName('');
+    const parents = useMemo(() => {
+        switch(activeTab) {
+            case 'modulo': return cursos;
+            case 'disciplina': return modulos;
+            case 'assunto': return disciplinas;
+            default: return [];
         }
-    };
-
-    const handleDeleteAssunto = (assuntoId: string) => {
-        if(window.confirm('Tem certeza que deseja remover este assunto?')) {
-            setAssuntos(prev => prev.filter(a => a.id !== assuntoId));
-        }
-    };
-    
-    const disciplinasFiltradas = useMemo(() => {
-        if (!selectedModulo) return [];
-        return disciplinas.filter(d => d.moduloId === selectedModulo.id);
-    }, [disciplinas, selectedModulo]);
-
-    const assuntosFiltrados = useMemo(() => {
-        if (!selectedDisciplina) return [];
-        return assuntos.filter(a => a.disciplinaId === selectedDisciplina.id);
-    }, [assuntos, selectedDisciplina]);
-    
-    // Auto-select first disciplina when modulo changes
-    React.useEffect(() => {
-        setSelectedDisciplina(disciplinasFiltradas[0] || null);
-    }, [selectedModulo, disciplinas]);
-
+    }, [activeTab, cursos, modulos, disciplinas]);
 
     return (
         <div className="space-y-8 animate-fade-in">
+             <AcademicItemFormModal
+                isOpen={isModalOpen}
+                onClose={() => setIsModalOpen(false)}
+                onSave={handleSave}
+                itemType={activeTab}
+                currentItem={editingItem}
+                parents={parents}
+            />
             <header>
-                <h1 className="text-3xl font-bold text-gray-900">
-                    {isDisciplinaMode ? 'Gerenciamento de Disciplinas' : 'Gerenciamento de Assuntos'}
-                </h1>
-                <p className="text-gray-600 mt-1">
-                    {isDisciplinaMode 
-                        ? 'Crie e organize as disciplinas dentro de cada módulo.' 
-                        : 'Selecione uma disciplina para criar e organizar seus assuntos.'}
-                </p>
+                <h1 className="text-3xl font-bold text-gray-900">Gestão Acadêmica</h1>
+                <p className="text-gray-600 mt-1">Gerencie a estrutura de Cursos, Módulos, Disciplinas e Assuntos.</p>
             </header>
             
-            <div className="mb-4">
-                <label htmlFor="modulo-select" className="block text-sm font-medium text-gray-700 mb-2">Selecione um Módulo para gerenciar:</label>
-                <select 
-                    id="modulo-select"
-                    value={selectedModulo?.id || ''}
-                    onChange={(e) => setSelectedModulo(modulos.find(m => m.id === e.target.value) || null)}
-                    className="w-full max-w-sm bg-white border border-gray-300 rounded-md p-2.5 text-gray-800 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-                >
-                     <option value="" disabled>Escolha um módulo</option>
-                    {modulos.map(m => <option key={m.id} value={m.id}>{m.descricao}</option>)}
-                </select>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 h-[calc(100vh-280px)]">
-                {/* Disciplinas Panel */}
-                <div className="lg:col-span-1 bg-white border border-gray-200 rounded-xl flex flex-col">
-                    <div className="p-4 border-b border-gray-200">
-                        <h2 className="text-lg font-semibold text-gray-800">Disciplinas ({disciplinasFiltradas.length})</h2>
-                    </div>
-                     {isDisciplinaMode && selectedModulo && (
-                        <div className="p-4 border-b border-gray-200">
-                            <form onSubmit={handleAddDisciplina} className="flex gap-2">
-                               <input
-                                    type="text"
-                                    value={newDisciplinaName}
-                                    onChange={e => setNewDisciplinaName(e.target.value)}
-                                    placeholder="Nova disciplina..."
-                                    className="flex-grow bg-white border border-gray-300 rounded-md p-2 text-sm focus:ring-purple-500 focus:border-purple-500"
-                                />
-                                <button type="submit" className="p-2 bg-purple-600 text-white rounded-md hover:bg-purple-700"><PlusCircleIcon className="w-5 h-5"/></button>
-                            </form>
-                        </div>
-                    )}
-                    <div className="flex-grow overflow-y-auto">
-                        {disciplinasFiltradas.map(d => (
-                            <button 
-                                key={d.id}
-                                onClick={() => setSelectedDisciplina(d)}
-                                className={`w-full text-left p-4 flex items-center gap-3 transition-colors ${selectedDisciplina?.id === d.id ? 'bg-purple-50 text-purple-700 font-semibold' : 'hover:bg-gray-100'}`}
-                            >
-                                <GraduationCapIcon className="w-5 h-5 flex-shrink-0" />
-                                <span className="font-medium">{d.descricao}</span>
-                            </button>
+            <div className="bg-white border border-gray-200 rounded-xl p-5">
+                <div className="flex justify-between items-center mb-5 border-b border-gray-200">
+                    <nav className="flex space-x-2">
+                        {(Object.keys(tables) as ItemType[]).map(tab => (
+                            <button key={tab} onClick={() => setActiveTab(tab)} className={`capitalize py-2 px-4 font-semibold ${activeTab === tab ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500'}`}>{tab}s</button>
                         ))}
-                    </div>
+                    </nav>
+                     <button onClick={() => { setEditingItem(null); setIsModalOpen(true);}} className="px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg flex items-center space-x-2">
+                        <PlusCircleIcon className="w-5 h-5" />
+                        <span>Adicionar {activeTab}</span>
+                    </button>
                 </div>
 
-                {/* Assuntos Panel */}
-                <div className="lg:col-span-2 bg-white border border-gray-200 rounded-xl flex flex-col">
-                    <div className="p-4 border-b border-gray-200">
-                         {selectedDisciplina ? (
-                            <h2 className="text-lg font-semibold text-gray-800">Assuntos em <span className="text-purple-600">{selectedDisciplina.descricao}</span> ({assuntosFiltrados.length})</h2>
-                         ) : (
-                            <h2 className="text-lg font-semibold text-gray-800">Selecione uma disciplina</h2>
-                         )}
-                    </div>
-                    {selectedDisciplina ? (
-                        <>
-                            <div className="p-4 border-b border-gray-200">
-                                <form onSubmit={handleAddAssunto} className="flex gap-2">
-                                    <input
-                                        type="text"
-                                        value={newAssuntoName}
-                                        onChange={e => setNewAssuntoName(e.target.value)}
-                                        placeholder="Novo assunto..."
-                                        className="flex-grow bg-white border border-gray-300 rounded-md p-2 text-sm focus:ring-purple-500 focus:border-purple-500"
-                                    />
-                                    <button type="submit" className="p-2 bg-purple-600 text-white rounded-md hover:bg-purple-700"><PlusCircleIcon className="w-5 h-5"/></button>
-                                </form>
-                            </div>
-                            <div className="flex-grow overflow-y-auto">
-                                <table className="w-full text-left">
-                                    <thead className="sticky top-0 bg-gray-50">
-                                        <tr><th className="p-4 font-semibold text-sm text-gray-600">Descrição do Assunto</th><th className="p-4 text-right">Ações</th></tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-gray-200">
-                                        {assuntosFiltrados.map(a => (
-                                            <tr key={a.id} className="hover:bg-gray-50">
-                                                <td className="p-4 font-medium text-gray-800">{a.descricao}</td>
-                                                <td className="p-4">
-                                                    <div className="flex items-center space-x-1 justify-end">
-                                                        <button className="p-2 rounded-md text-gray-500 hover:text-purple-600 hover:bg-purple-100 transition-colors" title="Editar"><EditIcon className="w-5 h-5"/></button>
-                                                        <button onClick={() => handleDeleteAssunto(a.id)} className="p-2 rounded-md text-gray-500 hover:text-red-600 hover:bg-red-100 transition-colors" title="Remover"><TrashIcon className="w-5 h-5"/></button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                                {assuntosFiltrados.length === 0 && <p className="p-8 text-center text-gray-500">Nenhum assunto cadastrado para esta disciplina.</p>}
-                            </div>
-                        </>
+                <div className="overflow-x-auto">
+                    {loading ? <div className="text-center py-10">Carregando...</div> :
+                    items.length > 0 ? (
+                        <table className="w-full text-left">
+                            <thead className="bg-gray-50">
+                                <tr>
+                                    <th className="p-4 font-semibold text-sm text-gray-600">Descrição</th>
+                                    {activeTab !== 'curso' && <th className="p-4 font-semibold text-sm text-gray-600">Vinculado a</th>}
+                                    <th className="p-4 font-semibold text-sm text-gray-600 text-right">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-200">
+                                {items.map(item => (
+                                    <tr key={item.id} className="hover:bg-gray-50">
+                                        <td className="p-4 font-medium text-gray-900">{item.descricao}</td>
+                                        {activeTab !== 'curso' && <td className="p-4 text-gray-600">{getParentName(item)}</td>}
+                                        <td className="p-4 text-right">
+                                            <button onClick={() => {setEditingItem(item); setIsModalOpen(true);}} className="p-2 text-gray-500 hover:text-blue-600"><EditIcon className="w-5 h-5"/></button>
+                                            <button onClick={() => handleDelete(item.id)} className="p-2 text-gray-500 hover:text-red-600"><TrashIcon className="w-5 h-5"/></button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
                     ) : (
-                        <div className="flex-grow flex items-center justify-center text-center text-gray-500">
-                             {!selectedModulo 
-                                ? <p>Selecione um módulo para começar.</p> 
-                                : <p>Selecione uma disciplina à esquerda para ver seus assuntos.</p>}
+                         <div className="text-center py-16">
+                            <FolderKanbanIcon className="w-12 h-12 mx-auto text-gray-400 mb-4"/>
+                            <p className="text-gray-500 font-semibold">Nenhum {activeTab} encontrado.</p>
                         </div>
-                     )}
+                    )}
                 </div>
             </div>
         </div>

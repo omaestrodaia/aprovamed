@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { Question } from '../types';
+
+import React, { useState, useEffect, useMemo } from 'react';
+import { Question, Disciplina, Assunto } from '../types';
 import { XIcon } from './icons';
 
 interface QuestionEditorModalProps {
@@ -7,9 +8,11 @@ interface QuestionEditorModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (updatedQuestion: Question) => void;
+  disciplinas: Disciplina[];
+  assuntos: Assunto[];
 }
 
-export const QuestionEditorModal: React.FC<QuestionEditorModalProps> = ({ question, isOpen, onClose, onSave }) => {
+export const QuestionEditorModal: React.FC<QuestionEditorModalProps> = ({ question, isOpen, onClose, onSave, disciplinas, assuntos }) => {
   const [formData, setFormData] = useState<Question | null>(null);
 
   useEffect(() => {
@@ -18,11 +21,20 @@ export const QuestionEditorModal: React.FC<QuestionEditorModalProps> = ({ questi
     }
   }, [question]);
 
+  const filteredAssuntos = useMemo(() => {
+    if (!formData?.disciplina_id) return [];
+    return assuntos.filter(a => a.disciplina_id === formData!.disciplina_id);
+  }, [formData?.disciplina_id, assuntos]);
+
   if (!isOpen || !formData) return null;
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement | HTMLInputElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement | HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => prev ? { ...prev, [name]: value } : null);
+     if (name === "disciplina_id") {
+      setFormData(prev => prev ? { ...prev, disciplina_id: value, assunto_id: '' } : null);
+    } else {
+      setFormData(prev => prev ? { ...prev, [name]: value } : null);
+    }
   };
   
   const handleAlternativeChange = (index: number, text: string) => {
@@ -49,12 +61,28 @@ export const QuestionEditorModal: React.FC<QuestionEditorModalProps> = ({ questi
     <div className="fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-50 p-4 animate-fade-in-fast">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col border border-gray-200">
         <div className="flex justify-between items-center p-5 border-b border-gray-200">
-          <h2 className="text-xl font-bold text-gray-800">Editar Questão <span className="text-purple-600">#{formData.id}</span></h2>
+          <h2 className="text-xl font-bold text-gray-800">Editar Questão <span className="text-blue-600">#{formData.id}</span></h2>
           <button onClick={onClose} className="text-gray-500 hover:text-gray-800 transition-colors p-1 rounded-full hover:bg-gray-100">
             <XIcon className="w-6 h-6" />
           </button>
         </div>
         <div className="p-6 overflow-y-auto space-y-6 bg-gray-50">
+           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Disciplina</label>
+              <select name="disciplina_id" value={formData.disciplina_id || ''} onChange={handleInputChange} className="w-full bg-white border border-gray-300 rounded-md p-3 text-gray-800 focus:ring-2 focus:ring-blue-500">
+                <option value="">Nenhuma</option>
+                {disciplinas.map(d => <option key={d.id} value={d.id}>{d.descricao}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Assunto</label>
+               <select name="assunto_id" value={formData.assunto_id || ''} onChange={handleInputChange} disabled={!formData.disciplina_id} className="w-full bg-white border border-gray-300 rounded-md p-3 text-gray-800 focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100">
+                <option value="">Nenhum</option>
+                {filteredAssuntos.map(a => <option key={a.id} value={a.id}>{a.descricao}</option>)}
+              </select>
+            </div>
+          </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Enunciado</label>
             <textarea
@@ -62,21 +90,21 @@ export const QuestionEditorModal: React.FC<QuestionEditorModalProps> = ({ questi
               value={formData.enunciado}
               onChange={handleInputChange}
               rows={5}
-              className="w-full bg-white border border-gray-300 rounded-md p-3 text-gray-800 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all"
+              className="w-full bg-white border border-gray-300 rounded-md p-3 text-gray-800 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
             />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Alternativas</label>
             <div className="space-y-4">
               {formData.alternativas.map((alt, index) => (
-                <div key={index} className="flex items-start space-x-4 p-3 bg-white rounded-lg border has-[:checked]:border-purple-500 has-[:checked]:bg-purple-50 transition-all">
+                <div key={index} className="flex items-start space-x-4 p-3 bg-white rounded-lg border has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50 transition-all">
                    <input
                     type="radio"
                     name="correta"
                     id={`correta-${alt.letra}`}
                     checked={formData.correta === alt.letra}
                     onChange={() => handleCorrectChange(alt.letra)}
-                    className="h-5 w-5 mt-1.5 text-purple-600 bg-gray-100 border-gray-300 focus:ring-purple-500 cursor-pointer"
+                    className="h-5 w-5 mt-1.5 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 cursor-pointer"
                   />
                   <label htmlFor={`correta-${alt.letra}`} className="w-full cursor-pointer">
                     <span className="font-bold text-gray-700">{alt.letra})</span>
@@ -84,7 +112,7 @@ export const QuestionEditorModal: React.FC<QuestionEditorModalProps> = ({ questi
                       value={alt.texto}
                       onChange={(e) => handleAlternativeChange(index, e.target.value)}
                       rows={2}
-                      className="w-full bg-white border border-gray-300 rounded-md p-2 mt-1 text-gray-800 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all"
+                      className="w-full bg-white border border-gray-300 rounded-md p-2 mt-1 text-gray-800 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
                     />
                   </label>
                 </div>
@@ -98,7 +126,7 @@ export const QuestionEditorModal: React.FC<QuestionEditorModalProps> = ({ questi
               value={formData.resolucao}
               onChange={handleInputChange}
               rows={3}
-              className="w-full bg-white border border-gray-300 rounded-md p-3 text-gray-800 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all"
+              className="w-full bg-white border border-gray-300 rounded-md p-3 text-gray-800 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
             />
           </div>
           <div>
@@ -108,13 +136,13 @@ export const QuestionEditorModal: React.FC<QuestionEditorModalProps> = ({ questi
               value={formData.dica}
               onChange={handleInputChange}
               rows={2}
-              className="w-full bg-white border border-gray-300 rounded-md p-3 text-gray-800 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all"
+              className="w-full bg-white border border-gray-300 rounded-md p-3 text-gray-800 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
             />
           </div>
         </div>
         <div className="flex justify-end p-5 border-t border-gray-200 bg-gray-50 rounded-b-xl">
           <button onClick={onClose} className="px-5 py-2.5 mr-3 bg-white border border-gray-300 text-gray-800 font-semibold rounded-lg hover:bg-gray-100 transition-colors">Cancelar</button>
-          <button onClick={handleSaveClick} className="px-5 py-2.5 bg-purple-600 text-white font-semibold rounded-lg hover:bg-purple-700 transition-colors">Salvar Alterações</button>
+          <button onClick={handleSaveClick} className="px-5 py-2.5 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors">Salvar Alterações</button>
         </div>
       </div>
     </div>

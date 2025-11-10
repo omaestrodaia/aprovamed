@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { ClassbuildSettings } from '../types';
 import { XIcon, CheckCircleIcon, XCircleIcon } from './icons';
@@ -75,7 +76,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, s
               name="apiKey"
               value={currentSettings.apiKey}
               onChange={handleChange}
-              className="w-full bg-white border border-gray-300 rounded-md p-3 text-gray-800 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+              className="w-full bg-white border border-gray-300 rounded-md p-3 text-gray-800 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               placeholder="Cole seu token aqui"
             />
           </div>
@@ -86,7 +87,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, s
               name="escolaId"
               value={currentSettings.escolaId}
               onChange={handleChange}
-              className="w-full bg-white border border-gray-300 rounded-md p-3 text-gray-800 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+              className="w-full bg-white border border-gray-300 rounded-md p-3 text-gray-800 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               placeholder="ID da sua escola na ClassBuild"
             />
           </div>
@@ -97,7 +98,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, s
               name="bancoQuestaoId"
               value={currentSettings.bancoQuestaoId}
               onChange={handleChange}
-              className="w-full bg-white border border-gray-300 rounded-md p-3 text-gray-800 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+              className="w-full bg-white border border-gray-300 rounded-md p-3 text-gray-800 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               placeholder="ID do banco de destino"
             />
           </div>
@@ -122,13 +123,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, s
             <button 
                 onClick={handleTestConnection}
                 disabled={testStatus === 'testing'}
-                className="w-40 px-4 py-2.5 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition-colors disabled:bg-indigo-400 disabled:cursor-wait flex justify-center items-center"
+                className="w-40 px-4 py-2.5 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors disabled:bg-blue-400 disabled:cursor-wait flex justify-center items-center"
             >
                 {testStatus === 'testing' ? (
                     <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
                 ) : "Testar Conexão"}
             </button>
-            <button onClick={handleSave} className="px-5 py-2.5 bg-purple-600 text-white font-semibold rounded-lg hover:bg-purple-700 transition-colors">Salvar</button>
+            <button onClick={handleSave} className="px-5 py-2.5 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors">Salvar</button>
           </div>
         </div>
       </div>
